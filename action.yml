@@ -10,7 +10,7 @@ inputs:
     description: 'Operation to run: create (new one-time secret) or view (reveal a secret)'
     required: true
   text:
-    description: 'Secret text to share (create). Use a GitHub secret: ${{ secrets.MY_SECRET }}'
+    description: 'Secret text to share (create). Reference a GitHub secret, e.g. secrets.MY_SECRET'
     required: false
     default: ''
   file:
