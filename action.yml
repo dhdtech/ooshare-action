@@ -41,10 +41,13 @@ inputs:
 outputs:
   url:
     description: 'The one-time share URL (create). Contains the decryption key — treat it as sensitive.'
+    value: ${{ steps.run.outputs.url }}
   id:
     description: 'The secret ID (create)'
+    value: ${{ steps.run.outputs.id }}
   text:
     description: 'The revealed secret text (view)'
+    value: ${{ steps.run.outputs.text }}
 
 runs:
   using: 'composite'
