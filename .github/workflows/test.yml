@@ -50,3 +50,54 @@ jobs:
         run: |
           test "${{ steps.again.outputs.text }}" = ""
           echo "one-time delete verified"
+
+  file-round-trip:
+    name: File round-trip (attach → reveal attachment)
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create a test file
+        shell: bash
+        run: |
+          printf 'PNGDATA' > secret.png
+          mkdir -p out
+
+      - name: Create a file secret (lang es)
+        id: create
+        uses: ./
+        with:
+          command: create
+          text: 'with file'
+          file: secret.png
+          ttl: 1
+          lang: es
+
+      - name: Verify lang + has_attachment
+        shell: bash
+        run: |
+          case "${{ steps.create.outputs.url }}" in
+            *'lng=es'*) echo "lang ok" ;;
+            *) echo "lang missing in ${{ steps.create.outputs.url }}"; exit 1 ;;
+          esac
+          test "${{ steps.create.outputs.has_attachment }}" = "true"
+          echo "create outputs ok"
+
+      - name: Reveal the attachment
+        id: reveal
+        uses: ./
+        with:
+          command: view
+          url: ${{ steps.create.outputs.url }}
+          output: out
+
+      - name: Verify the attachment
+        shell: bash
+        run: |
+          test "${{ steps.reveal.outputs.text }}" = "with file"
+          test "${{ steps.reveal.outputs.attachment-mime }}" = "image/png"
+          test "$(cat "${{ steps.reveal.outputs.attachment }}")" = "PNGDATA"
+          echo "file round-trip OK on ${{ runner.os }}"

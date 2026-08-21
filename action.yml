@@ -21,8 +21,16 @@ inputs:
     description: 'Expiry in hours (1-72)'
     required: false
     default: '24'
+  lang:
+    description: 'Viewer language for the share link (en, zh, es, hi, ar, pt)'
+    required: false
+    default: 'en'
   url:
     description: 'Share URL to reveal (view)'
+    required: false
+    default: ''
+  output:
+    description: 'Where to write a decoded file attachment (view): a directory, exact path, or - for stdout'
     required: false
     default: ''
   version:
@@ -45,9 +53,18 @@ outputs:
   id:
     description: 'The secret ID (create)'
     value: ${{ steps.run.outputs.id }}
+  has_attachment:
+    description: 'true when a file was attached (create)'
+    value: ${{ steps.run.outputs.has_attachment }}
   text:
     description: 'The revealed secret text (view)'
     value: ${{ steps.run.outputs.text }}
+  attachment:
+    description: 'Path where a decoded file attachment was written (view)'
+    value: ${{ steps.run.outputs.attachment }}
+  attachment-mime:
+    description: 'MIME type of a decoded file attachment (view)'
+    value: ${{ steps.run.outputs.attachment-mime }}
 
 runs:
   using: 'composite'
@@ -89,6 +106,7 @@ runs:
         OOSHARE_TEXT: ${{ inputs.text }}
         OOSHARE_URL: ${{ inputs.url }}
         OOSHARE_FILE: ${{ inputs.file }}
+        OOSHARE_OUTPUT: ${{ inputs.output }}
       run: |
         set -euo pipefail
         BIN=/tmp/ooshare-bin/ooshare
@@ -96,15 +114,25 @@ runs:
 
         case "${{ inputs.command }}" in
           create)
-            args=(create --json --ttl "${{ inputs.ttl }}" --api-url "${{ inputs.api-url }}" --origin "${{ inputs.origin }}")
+            args=(create --json --ttl "${{ inputs.ttl }}" --lang "${{ inputs.lang }}" \
+              --api-url "${{ inputs.api-url }}" --origin "${{ inputs.origin }}")
             [ -n "$OOSHARE_FILE" ] && args+=(--file "$OOSHARE_FILE")
             out="$(printf '%s' "$OOSHARE_TEXT" | "$BIN" "${args[@]}")"
             echo "url=$(printf '%s' "$out" | jq -r .url)" >> "$GITHUB_OUTPUT"
             echo "id=$(printf '%s' "$out" | jq -r .id)" >> "$GITHUB_OUTPUT"
+            echo "has_attachment=$(printf '%s' "$out" | jq -r .has_attachment)" >> "$GITHUB_OUTPUT"
             ;;
           view)
-            out="$("$BIN" view --json "$OOSHARE_URL")"
-            echo "text=$(printf '%s' "$out" | jq -r .text)" >> "$GITHUB_OUTPUT"
+            if [ -n "$OOSHARE_OUTPUT" ]; then
+              out="$("$BIN" view --json --output "$OOSHARE_OUTPUT" "$OOSHARE_URL")"
+            else
+              out="$("$BIN" view --json "$OOSHARE_URL")"
+            fi
+            echo "text=$(printf '%s' "$out" | jq -r '.text // empty')" >> "$GITHUB_OUTPUT"
+            if [ "$(printf '%s' "$out" | jq -r 'has("attachment")')" = "true" ]; then
+              echo "attachment=$(printf '%s' "$out" | jq -r .attachment.path)" >> "$GITHUB_OUTPUT"
+              echo "attachment-mime=$(printf '%s' "$out" | jq -r .attachment.mime)" >> "$GITHUB_OUTPUT"
+            fi
             ;;
           *)
             echo "::error::command must be 'create' or 'view', got '${{ inputs.command }}'"

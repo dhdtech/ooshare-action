@@ -46,6 +46,34 @@ The `url` output contains the decryption key — treat it as sensitive (post it 
 
 The secret is deleted from the server on first view — reveal it only once.
 
+### Reveal a secret that has a file attachment
+
+```yaml
+- uses: dhdtech/ooshare-action@v1
+  id: reveal
+  with:
+    command: view
+    url: ${{ steps.share.outputs.url }}
+    output: ./attachments   # directory, exact path, or '-' for stdout
+
+- name: Use the attachment
+  run: |
+    echo "attachment at: ${{ steps.reveal.outputs.attachment }}"
+    cat "${{ steps.reveal.outputs.attachment }}"
+```
+
+### Create with a file + viewer language
+
+```yaml
+- uses: dhdtech/ooshare-action@v1
+  with:
+    command: create
+    text: ${{ secrets.NOTE }}
+    file: ./contract.pdf
+    ttl: 48
+    lang: es          # recipient sees the page in Spanish
+```
+
 ## Inputs
 
 | Name | Description | Default |
@@ -54,7 +82,9 @@ The secret is deleted from the server on first view — reveal it only once.
 | `text` | Secret text (create) — use a GitHub secret | `''` |
 | `file` | Path to a file to attach (create) | `''` |
 | `ttl` | Expiry in hours (1–72) | `24` |
+| `lang` | Viewer language for the link (`en`, `zh`, `es`, `hi`, `ar`, `pt`) | `en` |
 | `url` | Share URL to reveal (view) | `''` |
+| `output` | Where to write a decoded attachment (view): dir, path, or `-` | `''` |
 | `version` | ooshare CLI release version | `v1.0.3` |
 | `api-url` | API base URL | `https://api.ooshare.io` |
 | `origin` | Site origin for the share URL | `https://ooshare.io` |
@@ -65,7 +95,10 @@ The secret is deleted from the server on first view — reveal it only once.
 |---|---|
 | `url` | The one-time share URL (create) — **sensitive** (contains the key) |
 | `id` | The secret ID (create) |
+| `has_attachment` | `true`/`false` — whether a file was attached (create) |
 | `text` | The revealed secret (view) |
+| `attachment` | Path where the decoded file was written (view) |
+| `attachment-mime` | MIME type of the decoded file (view) |
 
 ## How it works
 
