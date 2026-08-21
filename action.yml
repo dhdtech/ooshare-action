@@ -133,9 +133,9 @@ runs:
             ;;
           view)
             if [ -n "$OOSHARE_OUTPUT" ]; then
-              out="$("$BIN" view --json --output "$OOSHARE_OUTPUT" "$OOSHARE_URL")"
+              out="$("$BIN" view --json --api-url "${{ inputs.api-url }}" --output "$OOSHARE_OUTPUT" "$OOSHARE_URL")"
             else
-              out="$("$BIN" view --json "$OOSHARE_URL")"
+              out="$("$BIN" view --json --api-url "${{ inputs.api-url }}" "$OOSHARE_URL")"
             fi
             echo "text=$(printf '%s' "$out" | jq -r '.text // empty')" >> "$GITHUB_OUTPUT"
             if [ "$(printf '%s' "$out" | jq -r 'has("attachment")')" = "true" ]; then
