@@ -24,6 +24,10 @@ jobs:
           text: 'hello from ooshare-action'
           ttl: 1
 
+      - name: Debug create output
+        shell: bash
+        run: echo "create.url=[${{ steps.create.outputs.url }}] create.id=[${{ steps.create.outputs.id }}]"
+
       - name: Reveal it
         id: reveal
         uses: ./
