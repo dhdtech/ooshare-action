@@ -1,0 +1,52 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  round-trip:
+    name: Round-trip (create → view)
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create a secret
+        id: create
+        uses: ./
+        with:
+          command: create
+          text: 'hello from ooshare-action'
+          ttl: 1
+
+      - name: Reveal it
+        id: reveal
+        uses: ./
+        with:
+          command: view
+          url: ${{ steps.create.outputs.url }}
+
+      - name: Verify round-trip
+        shell: bash
+        run: |
+          test "${{ steps.reveal.outputs.text }}" = "hello from ooshare-action"
+          echo "round-trip OK on ${{ runner.os }}"
+
+      - name: Verify it is one-time (second reveal must fail)
+        id: again
+        continue-on-error: true
+        uses: ./
+        with:
+          command: view
+          url: ${{ steps.create.outputs.url }}
+
+      - name: Assert second reveal failed
+        shell: bash
+        run: |
+          test "${{ steps.again.outputs.text }}" = ""
+          echo "one-time delete verified"

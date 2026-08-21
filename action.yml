@@ -1,0 +1,110 @@
+name: 'ooshare'
+description: 'Create and reveal one-time secrets with the ooshare CLI, right in your workflow'
+author: 'dhdtech'
+branding:
+  icon: 'lock'
+  color: 'green'
+
+inputs:
+  command:
+    description: 'Operation to run: create (new one-time secret) or view (reveal a secret)'
+    required: true
+  text:
+    description: 'Secret text to share (create). Use a GitHub secret: ${{ secrets.MY_SECRET }}'
+    required: false
+    default: ''
+  file:
+    description: 'Path to a file to attach (create), relative to the workspace'
+    required: false
+    default: ''
+  ttl:
+    description: 'Expiry in hours (1-72)'
+    required: false
+    default: '24'
+  url:
+    description: 'Share URL to reveal (view)'
+    required: false
+    default: ''
+  version:
+    description: 'ooshare CLI release version (e.g. v1.0.3)'
+    required: false
+    default: 'v1.0.3'
+  api-url:
+    description: 'ooshare API base URL'
+    required: false
+    default: 'https://api.ooshare.io'
+  origin:
+    description: 'Site origin used to build the share URL'
+    required: false
+    default: 'https://ooshare.io'
+
+outputs:
+  url:
+    description: 'The one-time share URL (create). Contains the decryption key — treat it as sensitive.'
+  id:
+    description: 'The secret ID (create)'
+  text:
+    description: 'The revealed secret text (view)'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Download ooshare binary
+      shell: bash
+      run: |
+        set -euo pipefail
+        VER="${{ inputs.version }}"; VER="${VER#v}"
+        case "${{ runner.os }}" in
+          Linux)  OS=linux ;;
+          macOS)  OS=darwin ;;
+          Windows) OS=windows ;;
+          *) echo "::error::unsupported runner.os ${{ runner.os }}"; exit 1 ;;
+        esac
+        case "${{ runner.arch }}" in
+          X64)   ARCH=amd64 ;;
+          ARM64) ARCH=arm64 ;;
+          *) echo "::error::unsupported runner.arch ${{ runner.arch }}"; exit 1 ;;
+        esac
+        EXT=tar.gz; [ "$OS" = "windows" ] && EXT=zip
+        ASSET="ooshare_${VER}_${OS}_${ARCH}.${EXT}"
+        URL="https://github.com/dhdtech/ooshare.io/releases/download/v${VER}/${ASSET}"
+        echo "Downloading ${ASSET}"
+        curl -fsSL "$URL" -o /tmp/ooshare.$EXT
+        mkdir -p /tmp/ooshare-bin
+        if [ "$EXT" = "zip" ]; then
+          (cd /tmp/ooshare-bin && unzip -o /tmp/ooshare.zip ooshare.exe)
+        else
+          tar -xzf /tmp/ooshare.$EXT -C /tmp/ooshare-bin ooshare
+        fi
+        chmod +x /tmp/ooshare-bin/ooshare*
+        rm -f /tmp/ooshare.$EXT
+
+    - name: Run ooshare
+      id: run
+      shell: bash
+      env:
+        OOSHARE_TEXT: ${{ inputs.text }}
+        OOSHARE_URL: ${{ inputs.url }}
+        OOSHARE_FILE: ${{ inputs.file }}
+      run: |
+        set -euo pipefail
+        BIN=/tmp/ooshare-bin/ooshare
+        [ "${{ runner.os }}" = "Windows" ] && BIN=/tmp/ooshare-bin/ooshare.exe
+
+        case "${{ inputs.command }}" in
+          create)
+            args=(create --json --ttl "${{ inputs.ttl }}" --api-url "${{ inputs.api-url }}" --origin "${{ inputs.origin }}")
+            [ -n "$OOSHARE_FILE" ] && args+=(--file "$OOSHARE_FILE")
+            out="$(printf '%s' "$OOSHARE_TEXT" | "$BIN" "${args[@]}")"
+            echo "url=$(printf '%s' "$out" | jq -r .url)" >> "$GITHUB_OUTPUT"
+            echo "id=$(printf '%s' "$out" | jq -r .id)" >> "$GITHUB_OUTPUT"
+            ;;
+          view)
+            out="$("$BIN" view --json "$OOSHARE_URL")"
+            echo "text=$(printf '%s' "$out" | jq -r .text)" >> "$GITHUB_OUTPUT"
+            ;;
+          *)
+            echo "::error::command must be 'create' or 'view', got '${{ inputs.command }}'"
+            exit 1
+            ;;
+        esac
