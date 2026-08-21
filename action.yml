@@ -30,7 +30,7 @@ inputs:
     required: false
     default: ''
   output:
-    description: 'Where to write a decoded file attachment (view): a directory, exact path, or - for stdout'
+    description: 'Where to write a decoded file attachment (view): a directory or exact path. (Use the attachment output to read the file bytes in later steps.)'
     required: false
     default: ''
   version:
@@ -87,17 +87,26 @@ runs:
         esac
         EXT=tar.gz; [ "$OS" = "windows" ] && EXT=zip
         ASSET="ooshare_${VER}_${OS}_${ARCH}.${EXT}"
-        URL="https://github.com/dhdtech/ooshare.io/releases/download/v${VER}/${ASSET}"
+        BASE="https://github.com/dhdtech/ooshare.io/releases/download/v${VER}"
         echo "Downloading ${ASSET}"
-        curl -fsSL "$URL" -o /tmp/ooshare.$EXT
+        curl -fsSL "$BASE/${ASSET}" -o "/tmp/${ASSET}"
+        # Integrity gate: fail unless the archive matches the published SHA256SUMS.
+        # Every release is also cosign-signed with SLSA provenance (see the repo).
+        curl -fsSL "$BASE/SHA256SUMS" -o /tmp/ooshare.SHA256SUMS
+        sed 's/\r$//' /tmp/ooshare.SHA256SUMS | grep " ${ASSET}$" > /tmp/ooshare.check
+        if command -v sha256sum >/dev/null 2>&1; then
+          (cd /tmp && sha256sum -c ooshare.check)
+        else
+          (cd /tmp && shasum -a 256 -c ooshare.check)
+        fi
         mkdir -p /tmp/ooshare-bin
         if [ "$EXT" = "zip" ]; then
-          (cd /tmp/ooshare-bin && unzip -o /tmp/ooshare.zip ooshare.exe)
+          (cd /tmp/ooshare-bin && unzip -o "/tmp/${ASSET}" ooshare.exe)
         else
-          tar -xzf /tmp/ooshare.$EXT -C /tmp/ooshare-bin ooshare
+          tar -xzf "/tmp/${ASSET}" -C /tmp/ooshare-bin ooshare
         fi
         chmod +x /tmp/ooshare-bin/ooshare*
-        rm -f /tmp/ooshare.$EXT
+        rm -f "/tmp/${ASSET}" /tmp/ooshare.SHA256SUMS /tmp/ooshare.check
 
     - name: Run ooshare
       id: run

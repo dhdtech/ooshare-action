@@ -54,7 +54,7 @@ The secret is deleted from the server on first view — reveal it only once.
   with:
     command: view
     url: ${{ steps.share.outputs.url }}
-    output: ./attachments   # directory, exact path, or '-' for stdout
+    output: ./attachments   # directory or exact path
 
 - name: Use the attachment
   run: |
@@ -84,7 +84,7 @@ The secret is deleted from the server on first view — reveal it only once.
 | `ttl` | Expiry in hours (1–72) | `24` |
 | `lang` | Viewer language for the link (`en`, `zh`, `es`, `hi`, `ar`, `pt`) | `en` |
 | `url` | Share URL to reveal (view) | `''` |
-| `output` | Where to write a decoded attachment (view): dir, path, or `-` | `''` |
+| `output` | Where to write a decoded attachment (view): directory or exact path. Read the bytes via the `attachment` output in later steps | `''` |
 | `version` | ooshare CLI release version | `v1.0.3` |
 | `api-url` | API base URL | `https://api.ooshare.io` |
 | `origin` | Site origin for the share URL | `https://ooshare.io` |
@@ -102,13 +102,14 @@ The secret is deleted from the server on first view — reveal it only once.
 
 ## How it works
 
-The action downloads the `ooshare` binary for your runner (Linux/macOS/Windows × amd64/arm64) from the [ooshare.io releases](https://github.com/dhdtech/ooshare.io/releases), runs `ooshare create` or `ooshare view` with JSON output, and exposes the URL / secret as outputs. No plaintext ever reaches the ooshare server — encryption happens in the binary, the master key travels only in the URL fragment.
+The action downloads the `ooshare` binary for your runner (Linux/macOS/Windows × amd64/arm64) from the [ooshare.io releases](https://github.com/dhdtech/ooshare.io/releases), **verifies its SHA-256 against the release `SHA256SUMS` before running it**, then runs `ooshare create` or `ooshare view` with JSON output and exposes the URL / secret as outputs. No plaintext ever reaches the ooshare server — encryption happens in the binary, the master key travels only in the URL fragment. Every CLI release is additionally cosign-signed with SLSA provenance.
 
 ## Security
 
 - Never hardcode secret text in your workflow file — use `${{ secrets.* }}`.
 - The `url` output embeds the decryption key. Share it over a private channel.
 - Secrets are one-time: after `view`, the server deletes them.
+- The `ooshare` binary is checked against the release `SHA256SUMS` before execution, so a tampered or swapped release artifact fails the step instead of running. Pin the CLI with the `version` input (default `v1.0.3`) and bump it deliberately — a pinned version is the supply-chain-safe choice.
 
 ## License
 
