@@ -1,4 +1,4 @@
-name: 'ooshare'
+name: 'ooshare-action'
 description: 'Create and reveal one-time secrets with the ooshare CLI, right in your workflow'
 author: 'dhdtech'
 branding:
